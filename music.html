@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Music Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile if content is scrollable */
+        }
+        /* Custom scrollbar for better aesthetics if needed */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .btn {
+            @apply px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-colors duration-150;
+        }
+        .input-field {
+            @apply mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm;
+        }
+        .card {
+            @apply bg-white p-6 sm:p-8 rounded-xl shadow-xl;
+        }
+        #audioPlayer {
+            @apply w-full mt-4 rounded-lg;
+        }
+        /* Custom modal styles */
+        .modal {
+            @apply fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 transition-opacity duration-300;
+        }
+        .modal-content {
+            @apply bg-white p-6 rounded-lg shadow-xl w-full max-w-md mx-auto transform transition-all duration-300 scale-95 opacity-0;
+        }
+        .modal.active .modal-content {
+            @apply scale-100 opacity-100;
+        }
+        .modal-title {
+            @apply text-xl font-semibold mb-4 text-gray-800;
+        }
+        .modal-body {
+            @apply text-gray-700 mb-6;
+        }
+        .modal-footer {
+            @apply flex justify-end space-x-3;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-700 text-gray-200 min-h-screen flex flex-col items-center justify-center p-4 selection:bg-sky-500 selection:text-white">
+
+    <div class="w-full max-w-2xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">Listen Together</h1>
+            <p class="text-slate-400 mt-2 text-lg">Sync your music with friends in real-time.</p>
+        </header>
+
+        <div id="appContainer" class="card bg-slate-800 shadow-2xl">
+            <div class="mb-6 p-3 bg-slate-700 rounded-lg text-center">
+                <p class="text-sm text-slate-400">Your User ID (for reference):</p>
+                <p id="userIdDisplay" class="font-mono text-sky-400 break-all">-</p>
+            </div>
+
+            <div id="roomManagement" class="space-y-4 mb-6">
+                <div>
+                    <label for="roomIdInput" class="block text-sm font-medium text-slate-300">Enter Room ID to Join:</label>
+                    <input type="text" id="roomIdInput" class="input-field bg-slate-700 border-slate-600 text-slate-200 placeholder-slate-500" placeholder="e.g., abc123">
+                </div>
+                <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                    <button id="createRoomBtn" class="btn bg-sky-500 hover:bg-sky-600 w-full">Create New Room</button>
+                    <button id="joinRoomBtn" class="btn bg-green-500 hover:bg-green-600 w-full">Join Room</button>
+                </div>
+            </div>
+
+            <div id="activeRoomInfo" class="hidden text-center mb-6 p-4 bg-slate-700/50 rounded-lg">
+                <p class="text-slate-400">Current Room ID: <strong id="roomIdDisplay" class="text-amber-400 font-mono"></strong></p>
+                <p id="hostIndicator" class="text-sm text-slate-400"></p>
+            </div>
+            
+            <div id="statusMessageContainer" class="mb-4 p-3 bg-slate-700 rounded-lg text-center hidden">
+                 <p id="statusMessage" class="text-sm text-slate-300"></p>
+            </div>
+
+
+            <div id="fileSelection" class="hidden mb-6">
+                <label for="audioFile" class="block text-sm font-medium text-slate-300 mb-1">Select Audio File:</label>
+                <input type="file" id="audioFile" accept="audio/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-sky-500 file:text-sky-50 hover:file:bg-sky-600 transition-colors">
+                <p id="hostSongFileInfo" class="text-xs text-slate-500 mt-2"></p>
+            </div>
+
+            <audio id="audioPlayer" class="w-full mt-4 rounded-lg outline-none"></audio> <div id="customControls" class="hidden flex items-center justify-center space-x-4 mt-6 p-4 bg-slate-700/50 rounded-lg">
+                <button id="playPauseBtn" class="btn bg-emerald-500 hover:bg-emerald-600 w-28">Play</button>
+                <div class="flex flex-col items-center w-full max-w-xs">
+                     <input type="range" id="seekBar" value="0" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-sky-500" disabled>
+                     <div class="text-xs text-slate-400 mt-1 w-full flex justify-between">
+                        <span id="currentTimeDisplay">0:00</span>
+                        <span id="durationDisplay">0:00</span>
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="genericModal" class="modal opacity-0 pointer-events-none">
+        <div class="modal-content">
+            <h3 id="modalTitle" class="modal-title">Notification</h3>
+            <p id="modalBody" class="modal-body">This is a modal message.</p>
+            <div class="modal-footer">
+                <button id="modalOkButton" class="btn bg-blue-500 hover:bg-blue-600">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, updateDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase configuration (user-provided for self-hosting)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAQ7f_vH2ST9DSmBjHHw2lwLB_vfbac9io",
+            authDomain: "music-e88d2.firebaseapp.com",
+            projectId: "music-e88d2",
+            storageBucket: "music-e88d2.appspot.com", // Standard format is project-id.appspot.com, using user provided if different. Verify if issues.
+            messagingSenderId: "778146362471",
+            appId: "1:778146362471:web:7218372924110d128d10c2", // This is the Firebase Web App's ID
+            measurementId: "G-K06JE06P91"
+        };
+        
+        // This 'appId' is used for namespacing data within Firestore (e.g., /artifacts/{appId}/...)
+        // Using the Firebase Project ID is a good practice here for uniqueness when self-hosting.
+        const appId = firebaseConfig.projectId || 'default-music-sync-app';
+
+
+        // Initialize Firebase
+        let app;
+        let db;
+        let auth;
+        let currentUserId = null;
+        let isAuthReady = false;
+
+        // DOM Elements
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const roomIdInput = document.getElementById('roomIdInput');
+        const createRoomBtn = document.getElementById('createRoomBtn');
+        const joinRoomBtn = document.getElementById('joinRoomBtn');
+        const activeRoomInfo = document.getElementById('activeRoomInfo');
+        const roomIdDisplayElem = activeRoomInfo.querySelector('#roomIdDisplay');
+        const hostIndicator = document.getElementById('hostIndicator');
+        const fileSelection = document.getElementById('fileSelection');
+        const audioFile = document.getElementById('audioFile');
+        const hostSongFileInfo = document.getElementById('hostSongFileInfo');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const statusMessageContainer = document.getElementById('statusMessageContainer');
+        const statusMessage = document.getElementById('statusMessage');
+        const roomManagement = document.getElementById('roomManagement');
+
+        const customControls = document.getElementById('customControls');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const seekBar = document.getElementById('seekBar');
+        const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+        const durationDisplay = document.getElementById('durationDisplay');
+        
+        // Modal elements
+        const genericModal = document.getElementById('genericModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalOkButton = document.getElementById('modalOkButton');
+
+        // App State
+        let currentRoomId = null;
+        let isHost = false;
+        let roomUnsubscribe = null; // To detach Firestore listener
+        let localFileSelected = false;
+        let timeUpdateInterval = null; // For throttling time updates
+
+        // --- Modal Functions ---
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalBody.textContent = message;
+            genericModal.classList.add('active', 'opacity-100');
+            genericModal.classList.remove('pointer-events-none');
+            modalOkButton.focus();
+        }
+
+        function hideModal() {
+            genericModal.classList.remove('active', 'opacity-100');
+            genericModal.classList.add('pointer-events-none');
+        }
+        modalOkButton.addEventListener('click', hideModal);
+
+
+        // --- Firebase Initialization and Auth ---
+        async function initializeFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                // setLogLevel('debug'); // Optional: for Firestore debugging
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        userIdDisplay.textContent = currentUserId;
+                        isAuthReady = true;
+                        console.log("Authenticated User ID:", currentUserId);
+                        enableRoomButtons();
+                    } else {
+                        console.log("User not authenticated after onAuthStateChanged. Should be handled by signInAnonymously.");
+                        // Fallback, though signInAnonymously should prevent this state if it succeeds
+                        currentUserId = `anon-${crypto.randomUUID().slice(0,8)}`; 
+                        userIdDisplay.textContent = currentUserId + " (Fallback/Error)";
+                        isAuthReady = true; 
+                        enableRoomButtons();
+                    }
+                });
+
+                // For self-hosting, __initial_auth_token will be undefined.
+                // We will rely on anonymous sign-in.
+                await signInAnonymously(auth);
+                console.log("Attempted to sign in anonymously.");
+
+            } catch (error) {
+                console.error("Firebase initialization error:", error);
+                showModal("Error", "Could not initialize Firebase. Please refresh. " + error.message);
+                disableRoomButtons(); 
+            }
+        }
+
+        function disableRoomButtons() {
+            createRoomBtn.disabled = true;
+            joinRoomBtn.disabled = true;
+            createRoomBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            joinRoomBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        function enableRoomButtons() {
+            createRoomBtn.disabled = false;
+            joinRoomBtn.disabled = false;
+            createRoomBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            joinRoomBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+
+        // --- Room Management ---
+        function getRoomDocRef(roomId) {
+            // Path: /artifacts/{appId}/public/data/{collectionName}/{documentId}
+            // 'appId' here is firebaseConfig.projectId for namespacing
+            return doc(db, "artifacts", appId, "public/data/music_sync", roomId);
+        }
+
+        async function createRoom() {
+            if (!isAuthReady || !currentUserId) {
+                showModal("Authentication Error", "User not authenticated. Please wait or refresh.");
+                return;
+            }
+            currentRoomId = crypto.randomUUID().slice(0, 6).toLowerCase();
+            isHost = true;
+            const roomDocRef = getRoomDocRef(currentRoomId);
+
+            try {
+                await setDoc(roomDocRef, {
+                    hostUserId: currentUserId,
+                    isPlaying: false,
+                    currentTime: 0,
+                    songFileName: null,
+                    lastHostUpdate: serverTimestamp()
+                });
+                showStatusMessage(`Room created! ID: ${currentRoomId}. Share this ID with your friend.`, 'success');
+                enterRoomUI();
+                listenToRoomChanges();
+            } catch (error) {
+                console.error("Error creating room:", error);
+                showModal("Error", "Could not create room: " + error.message);
+            }
+        }
+
+        async function joinRoom() {
+            if (!isAuthReady || !currentUserId) {
+                showModal("Authentication Error", "User not authenticated. Please wait or refresh.");
+                return;
+            }
+            const inputRoomId = roomIdInput.value.trim().toLowerCase();
+            if (!inputRoomId) {
+                showModal("Input Error", "Please enter a Room ID.");
+                return;
+            }
+
+            currentRoomId = inputRoomId;
+            isHost = false; 
+            const roomDocRef = getRoomDocRef(currentRoomId);
+
+            try {
+                const roomSnap = await getDoc(roomDocRef);
+                if (roomSnap.exists()) {
+                    const roomData = roomSnap.data();
+                    if (roomData.hostUserId === currentUserId) {
+                        isHost = true; 
+                         showStatusMessage(`Rejoined your room: ${currentRoomId}.`, 'info');
+                    } else {
+                         showStatusMessage(`Joined room: ${currentRoomId}. Waiting for host to select a song.`, 'info');
+                    }
+                    enterRoomUI();
+                    listenToRoomChanges(); 
+                } else {
+                    showModal("Error", "Room not found. Check the ID and try again.");
+                    currentRoomId = null; 
+                }
+            } catch (error) {
+                console.error("Error joining room:", error);
+                showModal("Error", "Could not join room: " + error.message);
+            }
+        }
+        
+        function enterRoomUI() {
+            roomIdDisplayElem.textContent = currentRoomId;
+            hostIndicator.textContent = isHost ? "You are the HOST." : "You are a LISTENER.";
+            activeRoomInfo.classList.remove('hidden');
+            fileSelection.classList.remove('hidden');
+            customControls.classList.remove('hidden');
+            roomManagement.classList.add('hidden'); 
+            roomIdInput.value = ''; 
+            
+            if (isHost) {
+                seekBar.disabled = false;
+                playPauseBtn.disabled = false;
+            } else {
+                seekBar.disabled = true;
+                playPauseBtn.disabled = true; 
+                playPauseBtn.textContent = "Play"; 
+            }
+        }
+
+        function showStatusMessage(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessageContainer.classList.remove('hidden');
+            statusMessageContainer.className = `mb-4 p-3 rounded-lg text-center ${
+                type === 'error' ? 'bg-red-500/30 text-red-300' :
+                type === 'success' ? 'bg-green-500/30 text-green-300' :
+                'bg-slate-700 text-slate-300' // info
+            }`;
+        }
+
+
+        // --- Audio File Handling ---
+        audioFile.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                localFileSelected = true;
+                audioPlayer.src = URL.createObjectURL(file);
+                audioPlayer.load(); 
+
+                showStatusMessage(`Selected: ${file.name}. Ready to play/sync.`, 'success');
+                
+                if (isHost) {
+                    const roomDocRef = getRoomDocRef(currentRoomId);
+                    updateDoc(roomDocRef, { 
+                        songFileName: file.name,
+                        lastHostUpdate: serverTimestamp() 
+                    }).catch(err => console.error("Error updating song name:", err));
+                }
+                seekBar.value = 0;
+                currentTimeDisplay.textContent = formatTime(0);
+            } else {
+                localFileSelected = false;
+            }
+        });
+
+        // --- Firestore Listener ---
+        function listenToRoomChanges() {
+            if (roomUnsubscribe) roomUnsubscribe(); 
+
+            const roomDocRef = getRoomDocRef(currentRoomId);
+            roomUnsubscribe = onSnapshot(roomDocRef, (docSnap) => {
+                if (!docSnap.exists()) {
+                    showModal("Room Closed", "The room no longer exists or was closed.");
+                    leaveRoom();
+                    return;
+                }
+
+                const data = docSnap.data();
+                console.log("Firestore data received:", data);
+
+                if (data.hostUserId !== currentUserId) { 
+                    isHost = false; 
+                    hostIndicator.textContent = "You are a LISTENER.";
+                    seekBar.disabled = true;
+                    playPauseBtn.disabled = true;
+                } else {
+                    isHost = true;
+                    hostIndicator.textContent = "You are the HOST.";
+                    seekBar.disabled = false;
+                    playPauseBtn.disabled = false;
+                }
+
+                if (data.songFileName) {
+                    if (!isHost) {
+                         hostSongFileInfo.textContent = `Host selected: "${data.songFileName}". Please select the same file.`;
+                    } else {
+                         hostSongFileInfo.textContent = `You selected: "${data.songFileName}".`;
+                    }
+                } else {
+                    hostSongFileInfo.textContent = isHost ? "Select a song to start." : "Waiting for host to select a song...";
+                }
+
+                if (!localFileSelected) {
+                    if (data.songFileName && !isHost) {
+                        showStatusMessage(`Host selected '${data.songFileName}'. Please select the same file locally.`, 'info');
+                    }
+                    return;
+                }
+                
+                if (!isHost) { 
+                    if (Math.abs(audioPlayer.currentTime - data.currentTime) > 1.5) {
+                        audioPlayer.currentTime = data.currentTime;
+                        seekBar.value = data.currentTime; 
+                    }
+                    
+                    if (data.isPlaying && audioPlayer.paused) {
+                        audioPlayer.play().catch(e => console.warn("Client play error:", e));
+                        playPauseBtn.textContent = "Pause"; 
+                    } else if (!data.isPlaying && !audioPlayer.paused) {
+                        audioPlayer.pause();
+                        playPauseBtn.textContent = "Play"; 
+                    }
+                } else { 
+                     if (data.isPlaying && audioPlayer.paused) {
+                        audioPlayer.play().catch(e => console.warn("Host play error (on sync):", e));
+                    } else if (!data.isPlaying && !audioPlayer.paused) {
+                        audioPlayer.pause();
+                    }
+                }
+
+            }, (error) => {
+                console.error("Error listening to room changes:", error);
+                showModal("Connection Error", "Lost connection to room data: " + error.message);
+            });
+        }
+        
+        function leaveRoom() {
+            if (roomUnsubscribe) roomUnsubscribe();
+            roomUnsubscribe = null;
+            currentRoomId = null;
+            isHost = false;
+            localFileSelected = false;
+            
+            audioPlayer.src = ""; 
+            audioFile.value = ""; 
+
+            activeRoomInfo.classList.add('hidden');
+            fileSelection.classList.add('hidden');
+            customControls.classList.add('hidden');
+            roomManagement.classList.remove('hidden');
+            hostSongFileInfo.textContent = '';
+            showStatusMessage("You have left the room.", "info");
+        }
+
+        // --- Audio Player Event Handlers (for HOST) ---
+        function updateFirestoreState() {
+            if (!isHost || !currentRoomId || !localFileSelected) return;
+
+            const roomDocRef = getRoomDocRef(currentRoomId);
+            const dataToUpdate = {
+                isPlaying: !audioPlayer.paused,
+                currentTime: audioPlayer.currentTime,
+                lastHostUpdate: serverTimestamp()
+            };
+            
+            updateDoc(roomDocRef, dataToUpdate)
+                .catch(err => console.error("Error updating Firestore state:", err));
+        }
+
+        audioPlayer.onplay = () => {
+            playPauseBtn.textContent = "Pause";
+            if (isHost) updateFirestoreState();
+            if (timeUpdateInterval) clearInterval(timeUpdateInterval); 
+            if (isHost) { 
+                timeUpdateInterval = setInterval(() => {
+                    if (!audioPlayer.paused) { 
+                       updateFirestoreState(); 
+                    }
+                }, 750); 
+            }
+        };
+
+        audioPlayer.onpause = () => {
+            playPauseBtn.textContent = "Play";
+            if (isHost) updateFirestoreState();
+            if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+        };
+
+        audioPlayer.onended = () => {
+            playPauseBtn.textContent = "Play";
+            if (isHost) {
+                audioPlayer.currentTime = 0; 
+                updateFirestoreState(); 
+            }
+            if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+        };
+        
+        audioPlayer.ontimeupdate = () => {
+            if (!isNaN(audioPlayer.duration)) {
+                seekBar.value = audioPlayer.currentTime;
+                currentTimeDisplay.textContent = formatTime(audioPlayer.currentTime);
+            }
+        };
+
+        audioPlayer.onloadedmetadata = () => {
+            if (!isNaN(audioPlayer.duration)) {
+                seekBar.max = audioPlayer.duration;
+                durationDisplay.textContent = formatTime(audioPlayer.duration);
+            }
+        };
+
+        seekBar.addEventListener('input', () => {
+            if (isHost && localFileSelected && !isNaN(audioPlayer.duration)) {
+                audioPlayer.currentTime = seekBar.value;
+            }
+        });
+        seekBar.addEventListener('change', () => { 
+             if (isHost && localFileSelected && !isNaN(audioPlayer.duration)) {
+                audioPlayer.currentTime = seekBar.value;
+                updateFirestoreState(); 
+            }
+        });
+
+        playPauseBtn.addEventListener('click', () => {
+            if (!localFileSelected) {
+                showModal("No File", "Please select an audio file first.");
+                return;
+            }
+            if (isHost) {
+                if (audioPlayer.paused) {
+                    audioPlayer.play().catch(e => showModal("Playback Error", "Could not play audio: " + e.message));
+                } else {
+                    audioPlayer.pause();
+                }
+            }
+        });
+
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${min}:${sec}`;
+        }
+
+        // --- Event Listeners for Buttons ---
+        createRoomBtn.addEventListener('click', createRoom);
+        joinRoomBtn.addEventListener('click', joinRoom);
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            disableRoomButtons(); 
+            initializeFirebase();
+        });
+
+    </script>
+</body>
+</html>
